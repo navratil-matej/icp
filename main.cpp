@@ -365,7 +365,7 @@ void play_audio(std::string audio, glm::vec3 at, glm::mat4 v)
     audio = "res/audio/" + audio;
     if (!engine->isCurrentlyPlaying(audio.c_str()))
     {
-        at = glm::inverse(v) * glm::vec4(at, 1.0f);
+        at = v * glm::vec4(at, 1.0f);
         engine->play3D(audio.c_str(), irrklang::vec3df(at.x, at.y, at.z));
     }
 }
