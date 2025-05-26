@@ -1,0 +1,3 @@
+/home/des/Documents/school/icp-2425/demos/01 GL init/CMakeFiles/icp.dir
+/home/des/Documents/school/icp-2425/demos/01 GL init/CMakeFiles/edit_cache.dir
+/home/des/Documents/school/icp-2425/demos/01 GL init/CMakeFiles/rebuild_cache.dir
