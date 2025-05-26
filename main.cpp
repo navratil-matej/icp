@@ -762,29 +762,15 @@ int main(int argc, char** argv)
             auto n = cb_moon.handle_player(co, momentum);
             if(glm::length2(n) >= 0.1) // eps, effectively a zero vector
             {
-                if(glm::dot(n, co) < 0) // Regular impact towards the planet
-                {
-                    co -= momentum;
-                    momentum = 0.5f * (momentum - 2.0f * glm::dot(momentum, n) * n);
-                }
-                else // Impact while moving away from the planet caused by clipping - help the player out
-                {
-                    // momentum += 0.1f * n * glm::length(momentum);
-                }
+                co -= momentum;
+                momentum = 0.5f * (momentum - 2.0f * glm::dot(momentum, n) * n);
                 play_audio("impact.wav", cb_moon.get_pos(), v);
             }
             n = cb_earth.handle_player(co, momentum);
             if(glm::length2(n) >= 0.1) // eps, effectively a zero vector
             {
-                if(glm::dot(n, co) < 0) // Regular impact towards the planet
-                {
-                    co -= momentum;
-                    momentum = 0.5f * (momentum - 2.0f * glm::dot(momentum, n) * n);
-                }
-                else // Impact while moving away from the planet caused by clipping - help the player out
-                {
-                    // momentum += 0.1f * n * glm::length(momentum);
-                }
+                co -= momentum;
+                momentum = 0.5f * (momentum - 2.0f * glm::dot(momentum, n) * n);
                 play_audio("impact.wav", cb_earth.get_pos(), v);
             }
 
