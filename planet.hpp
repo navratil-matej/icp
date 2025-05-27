@@ -77,7 +77,7 @@ public:
     {
         if(orbit_origin != nullptr)
         {
-            return orbit_origin->get_pos() + orbit_radius * glm::vec3(std::sin(orbit_frac * M_PI * 2), 0.0f, std::cos(orbit_frac));
+            return orbit_origin->get_pos() + orbit_radius * glm::vec3(std::sin(orbit_frac * M_PI * 2), 0.0f, std::cos(orbit_frac * M_PI * 2));
         }
         else
         {

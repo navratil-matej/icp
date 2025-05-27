@@ -68,6 +68,7 @@ ShaderProgram tex_shader;
 Model player;
 GLuint player_texture;
 
+Planet cb_sun;
 Planet cb_earth;
 Planet cb_moon;
 
@@ -302,6 +303,30 @@ void init_assets(void) {
         0.5f, glm::vec3(0.2f), 4.0f, glm::vec3(1.5f), 2.0f, GL_TRUE
     );
 
+    cb_sun = Planet(
+        planetoid,
+        shader_program,
+        1.0f,
+        std::vector<glm::vec3>{
+            glm::vec3(0.7f, 0.5f, 0.0f),
+            glm::vec3(1.0f, 0.8f, 0.0f),
+            glm::vec3(0.7f, 0.4f, 0.0f),
+            glm::vec3(1.0f, 0.8f, 0.0f),
+            glm::vec3(0.7f, 0.4f, 0.0f),
+            glm::vec3(1.0f, 0.8f, 0.0f),
+            glm::vec3(0.7f, 0.4f, 0.0f),
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 0.0f, 0.0f),
+        },
+        std::vector<float>{
+            0.70f, 0.70f, 0.70f, 0.70f, 0.70f, 0.70f, 0.70f, 0.70f, 0.70f, 
+        },
+        std::vector<float>{
+            -0.50f, 0.20f, 0.25f, 0.45f, 0.50f, 0.55f, 0.65f, 0.90f, 2.00f,
+        },
+        0.5f, glm::vec3(0.3f), 8.0f, glm::vec3(8.0f), 0.5f, GL_FALSE
+    );
+
     cb_moon = Planet(
         planetoid,
         shader_program,
@@ -328,6 +353,8 @@ void init_assets(void) {
 
     cb_earth.set_default_pos(glm::vec3(0.0f));
     cb_moon.set_orbit(&cb_earth, 3.0f, 360.0f, 0.750f, -60.0f, 0.0f);
+    // A little geocentric here, that's just to make sure collisions work the best for the earth obj
+    cb_sun.set_orbit(&cb_earth, 42.42f, 720.0f, 0.125f, INFINITY, 0.0f);
 
     player = Model(std::vector<std::filesystem::path>{"res/models/player-opaque.obj", "res/models/player-transparent.obj"}, tex_shader); // So far works since only one transparent obj
     
@@ -490,7 +517,8 @@ void set_light(ShaderProgram sp) {
 
     sp.setUniform("uniform_AmbientI", glm::vec3(0.1f));
     
-    sp.setUniform("uniform_SunPos", glm::vec3(30.0f, 0.0f, 30.0f));
+    // sp.setUniform("uniform_SunPos", glm::vec3(30.0f, 0.0f, 30.0f));
+    sp.setUniform("uniform_SunPos", cb_sun.get_pos());
     sp.setUniform("uniform_DiffuseSunI", glm::vec3(0.7f));
     sp.setUniform("uniform_SpecularSunI", glm::vec3(0.7f));
 
@@ -672,9 +700,10 @@ int main(int argc, char** argv)
         shader_program.setUniform("uP_m", p);
 
         set_light(shader_program);
-
         cb_earth.draw();
         cb_moon .draw();
+        shader_program.setUniform("uniform_AmbientM", glm::vec3(10.0f));
+        cb_sun.  draw();
 
         // ============================================
         // "Dune" 
@@ -719,7 +748,8 @@ int main(int argc, char** argv)
             sim_time += sim_dt;
 
             cb_earth.update(sim_dt);
-            cb_moon.update(sim_dt);
+            cb_moon .update(sim_dt);
+            cb_sun  .update(sim_dt);
 
             // Angular thrust
             float dx = std::clamp((float)(face.x - face_center.x) * 8.0f, -1.0f, 1.0f);
@@ -759,12 +789,13 @@ int main(int argc, char** argv)
             co += momentum;
 
             // Collisions TODO still a little too much here and the sound is playing from the planetoid
-            auto n = cb_moon.handle_player(co, momentum);
+            glm::vec3 n;
+            n = cb_moon .handle_player(co, momentum);
             if(glm::length2(n) >= 0.1) // eps, effectively a zero vector
             {
                 co -= momentum;
                 momentum = 0.5f * (momentum - 2.0f * glm::dot(momentum, n) * n);
-                play_audio("impact.wav", cb_moon.get_pos(), v);
+                play_audio("impact.wav", cb_moon .get_pos(), v);
             }
             n = cb_earth.handle_player(co, momentum);
             if(glm::length2(n) >= 0.1) // eps, effectively a zero vector
@@ -772,6 +803,13 @@ int main(int argc, char** argv)
                 co -= momentum;
                 momentum = 0.5f * (momentum - 2.0f * glm::dot(momentum, n) * n);
                 play_audio("impact.wav", cb_earth.get_pos(), v);
+            }
+            n = cb_sun  .handle_player(co, momentum);
+            if(glm::length2(n) >= 0.1) // eps, effectively a zero vector
+            {
+                co -= momentum;
+                momentum = 0.5f * (momentum - 2.0f * glm::dot(momentum, n) * n);
+                play_audio("impact.wav", cb_sun  .get_pos(), v);
             }
 
             // Gravity TODO needs to be handled by handle_player
@@ -793,6 +831,8 @@ int main(int argc, char** argv)
             std::cout << "     " << rx.y << ", " << ry.y << ", " << rz.y << std::endl;
             std::cout << "     " << rx.z << ", " << ry.z << ", " << rz.z << std::endl;
             std::cout << "pos: " << co.x << ", " << co.y << ", " << co.z << std::endl;
+            auto su = cb_sun.get_pos();
+            std::cout << "sun: " << su.x << ", " << su.y << ", " << su.z << std::endl;
 		}
 	}
 
