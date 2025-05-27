@@ -130,6 +130,9 @@ float yaw, pitch;
 
 bool flashlight = false;
 
+bool  recalc_normals = true;
+float recalc_dist    = 7.78e-3f;
+
 GLint prev_window[4];
 
 irrklang::ISoundEngine* engine = nullptr;
@@ -176,6 +179,11 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
             pp_r = glm::rotate(glm::mat4(1.0f), 0.5f * (float)M_PI, glm::vec3(0.0f, 1.0f, 0.0f));
         }
     }
+
+    if (key == GLFW_KEY_F10 && action == GLFW_PRESS)
+	{
+        recalc_normals = !recalc_normals;
+	}
 
     if (key == GLFW_KEY_F11 && action == GLFW_PRESS)
 	{
@@ -266,6 +274,9 @@ static void cursor_position_callback(GLFWwindow* window, double xpos, double ypo
 static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     std::cout << "Scroll: [" << std::setw(6) << xoffset << ", " << std::setw(6) << yoffset << "] @ [" << std::setw(4) << mouse_xpos << ", " << std::setw(4) << mouse_ypos << "]\n";
+    // Debugging tool
+    // recalc_dist *= std::pow(1.1, yoffset);
+    // std::cout << "New recalc dist x1000: " << 1e3 * recalc_dist << std::endl;
 }
 
 void init_assets(void) {
@@ -515,19 +526,19 @@ void set_light(ShaderProgram sp) {
     sp.setUniform("uniform_SpecularM", glm::vec3(0.3f));
     sp.setUniform("uniform_SpecularShininess", 32.0f);
 
-    sp.setUniform("uniform_AmbientI", glm::vec3(0.1f));
+    sp.setUniform("uniform_AmbientI", glm::vec3(0.2f));
     
     // sp.setUniform("uniform_SunPos", glm::vec3(30.0f, 0.0f, 30.0f));
     sp.setUniform("uniform_SunPos", cb_sun.get_pos());
-    sp.setUniform("uniform_DiffuseSunI", glm::vec3(0.7f));
-    sp.setUniform("uniform_SpecularSunI", glm::vec3(0.7f));
+    sp.setUniform("uniform_DiffuseSunI", glm::vec3(0.6f));
+    sp.setUniform("uniform_SpecularSunI", glm::vec3(0.6f));
 
     sp.setUniform("uniform_PlayerPos", co - 0.001f * rz + 0.0003f * ry);
     sp.setUniform("uniform_PlayerForward", -rz);
     sp.setUniform("uniform_FlashlightInner", 0.95f);
     sp.setUniform("uniform_FlashlightOuter", 0.91f);
-    sp.setUniform("uniform_DiffusePlayerI", glm::vec3(flashlight ? 0.6f : 0.0f));
-    sp.setUniform("uniform_SpecularPlayerI", glm::vec3(flashlight ? 0.6f : 0.0f));
+    sp.setUniform("uniform_DiffusePlayerI", glm::vec3(flashlight ? 0.5f : 0.0f));
+    sp.setUniform("uniform_SpecularPlayerI", glm::vec3(flashlight ? 0.5f : 0.0f));
 }
 
 // !!! cmake . && make && __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./icp
@@ -700,9 +711,11 @@ int main(int argc, char** argv)
         shader_program.setUniform("uP_m", p);
 
         set_light(shader_program);
+        shader_program.setUniform("uniform_RecalcNormals", recalc_normals);
+        shader_program.setUniform("uniform_RecalcDist", recalc_dist);
         cb_earth.draw();
         cb_moon .draw();
-        shader_program.setUniform("uniform_AmbientM", glm::vec3(10.0f));
+        shader_program.setUniform("uniform_AmbientM", glm::vec3(5.0f));
         cb_sun.  draw();
 
         // ============================================

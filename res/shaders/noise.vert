@@ -24,6 +24,9 @@ uniform vec3  uniform_BaseSpatial = vec3(1.0f);
 uniform float uniform_SpatialRatio = 2.0f;
 uniform bool uniform_DoMakePoles = true;
 
+uniform bool uniform_RecalcNormals = true;
+uniform float uniform_RecalcDist = 3e-3;
+
 out float noise_value;
 
 // Outputs to the fragment shader
@@ -144,7 +147,7 @@ float mix_at(float lo, float hi, float val)
   return (val - lo) / (hi - lo);
 }
 
-void main()
+float noise_value_at(vec3 at)
 {
   vec3 s1 = uniform_BaseSpatial;
   vec3 s2 = s1 * uniform_SpatialRatio;
@@ -163,10 +166,10 @@ void main()
   float b_amplitude = a1 + a2 + a3 + a4 + a5 + a6;
 
   // vec3 pos = attribute_Position + uniform_DistortionAmount * snoise(attribute_Position * uniform_DistortionSpatial + 9999.0f);
-  vec3 pos = attribute_Position + uniform_DistortionAmount * vec3(
-    snoise(attribute_Position * uniform_DistortionSpatial + 9999.0f),
-    snoise(attribute_Position * uniform_DistortionSpatial - 4444.0f),
-    snoise(attribute_Position * uniform_DistortionSpatial - 9999.0f)
+  vec3 pos = at + uniform_DistortionAmount * vec3(
+    snoise(at * uniform_DistortionSpatial + 9999.0f),
+    snoise(at * uniform_DistortionSpatial - 4444.0f),
+    snoise(at * uniform_DistortionSpatial - 9999.0f)
   );
 
   float scale = b_amplitude
@@ -181,41 +184,43 @@ void main()
 
   if(uniform_DoMakePoles)
   {
-    float mixt = attribute_Position.y * attribute_Position.y;
+    float mixt = at.y * at.y;
     mixt = mixt * mixt;
     mixt = mixt * mixt;
     mixt = 1.0f - 1.5f * mixt;
-    noise_value = scale * mixt;
+    return scale * mixt;
   }
   else
   {
-    noise_value = scale;
+    return scale;
   }
+}
 
-  // TODO benchmark this - is it really worth it?
-  float displacement;
+// TODO benchmark this - is it really worth it?
+float displacement_for_value(float val)
+{
   if(noise_value < uniform_Threshold[4])
   {
     if(noise_value < uniform_Threshold[2])
     {
       if(noise_value < uniform_Threshold[1])
       {
-        displacement = mix(uniform_Height[0], uniform_Height[1], mix_at(uniform_Threshold[0], uniform_Threshold[1], noise_value));
+        return mix(uniform_Height[0], uniform_Height[1], mix_at(uniform_Threshold[0], uniform_Threshold[1], val));
       }
       else
       {
-        displacement = mix(uniform_Height[1], uniform_Height[2], mix_at(uniform_Threshold[1], uniform_Threshold[2], noise_value));
+        return mix(uniform_Height[1], uniform_Height[2], mix_at(uniform_Threshold[1], uniform_Threshold[2], val));
       }
     }
     else
     {
       if(noise_value < uniform_Threshold[3])
       {
-        displacement = mix(uniform_Height[2], uniform_Height[3], mix_at(uniform_Threshold[2], uniform_Threshold[3], noise_value));
+        return mix(uniform_Height[2], uniform_Height[3], mix_at(uniform_Threshold[2], uniform_Threshold[3], val));
       }
       else
       {
-        displacement = mix(uniform_Height[3], uniform_Height[4], mix_at(uniform_Threshold[3], uniform_Threshold[4], noise_value));
+        return mix(uniform_Height[3], uniform_Height[4], mix_at(uniform_Threshold[3], uniform_Threshold[4], val));
       }
     }
   }
@@ -225,26 +230,49 @@ void main()
     {
       if(noise_value < uniform_Threshold[5])
       {
-        displacement = mix(uniform_Height[4], uniform_Height[5], mix_at(uniform_Threshold[4], uniform_Threshold[5], noise_value));
+        return mix(uniform_Height[4], uniform_Height[5], mix_at(uniform_Threshold[4], uniform_Threshold[5], val));
       }
       else
       {
-        displacement = mix(uniform_Height[5], uniform_Height[6], mix_at(uniform_Threshold[5], uniform_Threshold[6], noise_value));
+        return mix(uniform_Height[5], uniform_Height[6], mix_at(uniform_Threshold[5], uniform_Threshold[6], val));
       }
     }
     else
     {
       if(noise_value < uniform_Threshold[7])
       {
-        displacement = mix(uniform_Height[6], uniform_Height[7], mix_at(uniform_Threshold[6], uniform_Threshold[7], noise_value));
+        return mix(uniform_Height[6], uniform_Height[7], mix_at(uniform_Threshold[6], uniform_Threshold[7], val));
       }
       else
       {
-        displacement = mix(uniform_Height[7], uniform_Height[8], mix_at(uniform_Threshold[7], uniform_Threshold[8], noise_value));
+        return mix(uniform_Height[7], uniform_Height[8], mix_at(uniform_Threshold[7], uniform_Threshold[8], val));
       }
     }
   }
+}
+
+void main()
+{
+  noise_value = noise_value_at(attribute_Position);
+  float displacement = displacement_for_value(noise_value);
   // gl_Position = uP_m * uV_m * uM_m * vec4(attribute_Position * displacement, 1.0f);
+
+  vec3 n;
+  if(uniform_RecalcNormals)
+  {
+    // Checked -zxy to be safe: https://www.wolframalpha.com/input?i=x+-+z+%3D+t+*+x%2C+y+-+x+%3D+t+*+y%2C+z+-+y+%3D+t+*+z
+    vec3 displacement_vec_x = attribute_Position * displacement;
+    vec3 u = normalize(cross(displacement_vec_x, -displacement_vec_x.zxy)) * uniform_RecalcDist;
+    vec3 v = normalize(cross(displacement_vec_x, u)) * uniform_RecalcDist;
+    vec3 displacement_vec_u = (attribute_Position + u) * displacement_for_value(noise_value_at(attribute_Position + u));
+    vec3 displacement_vec_v = (attribute_Position + v) * displacement_for_value(noise_value_at(attribute_Position + v));
+    n = normalize(cross(displacement_vec_u - displacement_vec_x, displacement_vec_v - displacement_vec_x));
+    n = n * sign(dot(displacement_vec_x, n));
+  }
+  else
+  {
+    n = attribute_Normal;
+  }
 
   // Create Model-View matrix
   mat4 mv_m = uV_m * uM_m;
@@ -255,7 +283,7 @@ void main()
 
   // -- Light module
   // Calculate normal in view space
-  vs_out.N = mat3(mv_m) * attribute_Normal;
+  vs_out.N = mat3(mv_m) * n;
   // Calculate view-space light vector
   vs_out.SunL = (uV_m * vec4(uniform_SunPos, 1.0)).xyz - P.xyz;
   // Calculate view-space light vector
