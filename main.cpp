@@ -68,6 +68,9 @@ ShaderProgram tex_shader;
 Model player;
 GLuint player_texture;
 
+Model skybox;
+GLuint skybox_texture;
+
 Planet cb_sun;
 Planet cb_earth;
 Planet cb_moon;
@@ -367,6 +370,7 @@ void init_assets(void) {
     // A little geocentric here, that's just to make sure collisions work the best for the earth obj
     cb_sun.set_orbit(&cb_earth, 42.42f, 720.0f, 0.125f, INFINITY, 0.0f);
 
+    skybox = Model("res/models/skybox.obj", tex_shader);
     player = Model(std::vector<std::filesystem::path>{"res/models/player-opaque.obj", "res/models/player-transparent.obj"}, tex_shader); // So far works since only one transparent obj
     
     // -- TODO couldn't get this to work
@@ -381,7 +385,11 @@ void init_assets(void) {
     // glTextureSubImage2D(player_texture, 0, 0, 0, image.cols, image.rows, GL_BGRA, GL_UNSIGNED_BYTE, image.ptr());
     // -- Using this instead
     int width, height, nrChannels;
-    unsigned char *data = stbi_load("res/textures/player.png", &width, &height, &nrChannels, 0);
+    unsigned char * data;
+
+    glGenTextures(1, &player_texture);
+    glBindTexture(GL_TEXTURE_2D, player_texture);
+    data = stbi_load("res/textures/player.png", &width, &height, &nrChannels, 0);
     if (data)
     {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
@@ -390,7 +398,21 @@ void init_assets(void) {
     stbi_image_free(data);
     // --
     glTextureParameteri(player_texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
     
+    glGenTextures(1, &skybox_texture);
+    glBindTexture(GL_TEXTURE_2D, skybox_texture);
+    data = stbi_load("res/textures/skybox.png", &width, &height, &nrChannels, 0);
+    if (data)
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    stbi_image_free(data);
+    // --
+    glTextureParameteri(skybox_texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    
+
     engine = irrklang::createIrrKlangDevice();
     if (!engine)
         throw std::runtime_error("Can not initialize sound engine.");
@@ -600,33 +622,6 @@ int main(int argc, char** argv)
 	else 
 		std::cout << "OpenGL version: " << version << '\n';
 
-    // GLfloat r,g,b,a;
-    // r=g=b=a=1.0f;
-
-    // Activate shader program. There is only one program, so activation can be out of the loop. 
-    // In more realistic scenarios, you will activate different shaders for different 3D objects.
-    // glUseProgram(shader_program.id());
-
-    // std::vector<glm::vec3> uniform_color_earth = {
-    //     glm::vec3(1.0f, 1.0f, 1.0f),
-    //     glm::vec3(1.0f, 1.0f, 1.0f),
-    //     glm::vec3(0.0f, 0.0f, 0.7f),
-    //     glm::vec3(0.0f, 0.0f, 0.7f),
-    //     glm::vec3(1.0f, 1.0f, 0.5f),
-    //     glm::vec3(0.0f, 0.5f, 0.0f),
-    //     glm::vec3(0.5f, 0.5f, 0.5f),
-    //     glm::vec3(1.0f, 1.0f, 1.0f),
-    //     glm::vec3(1.0f, 1.0f, 1.0f),
-    // };
-
-    // std::vector<float> uniform_height_earth = {
-    //      0.71f, 0.71f, 0.70f, 0.70f, 0.70f, 0.71f, 0.73f, 0.78f, 1.00f, 
-    // };
-
-    // std::vector<float> uniform_threshold_earth = {
-    //     -0.50f, 0.20f, 0.25f, 0.45f, 0.50f, 0.55f, 0.65f, 0.90f, 2.00f,
-    // };
-
     std::vector<glm::vec3> uniform_color_dune = {
         glm::vec3(0.7f, 0.6f, 0.3f),
         glm::vec3(0.7f, 0.6f, 0.3f),
@@ -646,26 +641,6 @@ int main(int argc, char** argv)
     std::vector<float> uniform_threshold_dune = {
         -0.50f, 0.20f, 0.35f, 0.40f, 0.55f, 0.60f, 0.75f, 0.80f, 2.00f,
     };
-
-    // std::vector<glm::vec3> uniform_color_moon = {
-    //     glm::vec3(0.5f, 0.5f, 0.5f),
-    //     glm::vec3(0.5f, 0.5f, 0.5f),
-    //     glm::vec3(0.7f, 0.7f, 0.7f),
-    //     glm::vec3(0.4f, 0.4f, 0.4f),
-    //     glm::vec3(0.4f, 0.4f, 0.4f),
-    //     glm::vec3(0.4f, 0.4f, 0.4f),
-    //     glm::vec3(0.4f, 0.4f, 0.4f),
-    //     glm::vec3(0.4f, 0.4f, 0.4f),
-    //     glm::vec3(0.4f, 0.4f, 0.4f),
-    // };
-
-    // std::vector<float> uniform_height_moon = {
-    //      0.70f, 0.70f, 0.72f, 0.70f, 0.40f, 0.70f, 0.70f, 0.70f, 0.70f,
-    // };
-
-    // std::vector<float> uniform_threshold_moon = {
-    //     -0.50f, 0.45f, 0.65f, 0.70f, 2.00f, 2.00f, 2.00f, 2.00f, 2.00f,
-    // };
 
     // shader_program.setUniform("uniform_Color", 9, )
 
@@ -705,7 +680,7 @@ int main(int argc, char** argv)
         GLint m_viewport[4];
         glGetIntegerv( GL_VIEWPORT, m_viewport );
         glm::vec2 C = glm::vec2((m_viewport[0] + m_viewport[2]) / 2.0f, (m_viewport[1] + m_viewport[3]) / 2.0f);
-        glm::mat4 p = glm::perspective((float) glm::radians(60.0), C.x / C.y, 1e-3f, 1e2f);
+        glm::mat4 p = glm::perspective((float) glm::radians(60.0), C.x / C.y, 1e-3f, 2e2f);
         shader_program.activate(); // TODO do away with these
         shader_program.setUniform("uV_m", v);
         shader_program.setUniform("uP_m", p);
@@ -738,10 +713,14 @@ int main(int argc, char** argv)
         tex_shader.setUniform("uP_m", p);
         // glBindTextureUnit(GL_TEXTURE0, player_texture);
         glEnable(GL_TEXTURE_2D);
-        glActiveTexture(GL_TEXTURE0); // TODO get this outta here
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, player_texture);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, skybox_texture);
         glUniform1i(glGetUniformLocation(tex_shader.id(), "tex0"), 0);
         player.draw(pmod);
+        glUniform1i(glGetUniformLocation(tex_shader.id(), "tex0"), 1);
+        skybox.draw(co, glm::vec3(0.0f), glm::vec3(100.0f));
         glDisable(GL_TEXTURE_2D);
 
 		double t = glfwGetTime();
