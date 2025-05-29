@@ -780,29 +780,13 @@ int main(int argc, char** argv)
             momentum *= 0.99f;
             co += momentum;
 
-            // Collisions TODO still a little too much here and the sound is playing from the planetoid
-            glm::vec3 n;
-            n = cb_moon .handle_player(co, momentum);
-            if(glm::length2(n) >= 0.1) // eps, effectively a zero vector
-            {
-                co -= momentum;
-                momentum = 0.5f * (momentum - 2.0f * glm::dot(momentum, n) * n);
+            // Collisions
+            if(cb_moon .act_on(co, momentum, rx, ry, rz, sim_dt))
                 play_audio("impact.wav", cb_moon .get_pos(), v);
-            }
-            n = cb_earth.handle_player(co, momentum);
-            if(glm::length2(n) >= 0.1) // eps, effectively a zero vector
-            {
-                co -= momentum;
-                momentum = 0.5f * (momentum - 2.0f * glm::dot(momentum, n) * n);
+            if(cb_earth.act_on(co, momentum, rx, ry, rz, sim_dt))
                 play_audio("impact.wav", cb_earth.get_pos(), v);
-            }
-            n = cb_sun  .handle_player(co, momentum);
-            if(glm::length2(n) >= 0.1) // eps, effectively a zero vector
-            {
-                co -= momentum;
-                momentum = 0.5f * (momentum - 2.0f * glm::dot(momentum, n) * n);
+            if(cb_sun  .act_on(co, momentum, rx, ry, rz, sim_dt))
                 play_audio("impact.wav", cb_sun  .get_pos(), v);
-            }
 
             // Gravity TODO needs to be handled by handle_player
             // momentum -= apos * 0.0001f / glm::length2(fromobj) * sim_dt;

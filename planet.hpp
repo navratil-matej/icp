@@ -73,11 +73,15 @@ public:
         orbit_frac += dt / orbit_time;
     }
 
-    glm::vec3 get_pos()
+    glm::vec3 get_pos(float sub_dt = 0.0f)
     {
         if(orbit_origin != nullptr)
         {
-            return orbit_origin->get_pos() + orbit_radius * glm::vec3(std::sin(orbit_frac * M_PI * 2), 0.0f, std::cos(orbit_frac * M_PI * 2));
+            return orbit_origin->get_pos() + orbit_radius * glm::vec3(
+                std::sin((orbit_frac + sub_dt / orbit_time) * M_PI * 2),
+                0.0f,
+                std::cos((orbit_frac + sub_dt / orbit_time) * M_PI * 2)
+            );
         }
         else
         {
@@ -85,10 +89,10 @@ public:
         }
     }
 
-    glm::vec3 get_rot()
+    glm::vec3 get_rot(float sub_dt = 0.0f)
     {
         // TODO Axial tilt would be fun
-        return glm::vec3(0.0f, revolution_frac * M_PI * 2, 0.0f);
+        return glm::vec3(0.0f, (revolution_frac + sub_dt / revolution_time) * M_PI * 2, 0.0f);
     }
 
     void draw()
@@ -112,33 +116,56 @@ public:
     /// @brief Handles gravity, collision, air drag (TODO).
     /// @param p_position 
     /// @param p_momentum 
-    /// @return normal vector of the collision in world-space or zero vector.
-    glm::vec3 handle_player(glm::vec3 p_position, glm::vec3 p_momentum)
+    /// @return whether collision happened, to play sound or similar.
+    bool act_on(glm::vec3 & p_position, glm::vec3 & p_momentum, glm::vec3 & p_basis_x, glm::vec3 & p_basis_y, glm::vec3 & p_basis_z, float sim_dt)
     {
         auto m = model.make_model_matrix(get_pos(), get_rot(), glm::vec3(scale));
         auto norm_p_position = glm::vec3(glm::inverse(m) * glm::vec4(p_position, 1.0f));
+        auto norm_p_sq_dist = glm::length2(norm_p_position);
 
+        // Collision
+        bool collided = false;
         auto apos = glm::normalize(norm_p_position);
         auto cpos = cpu_noise.get(apos);
-        if(glm::length2(cpos) - glm::length2(norm_p_position) > -0.001f)
+        if(glm::length2(cpos) - norm_p_sq_dist > -0.001f)
         {
             // Find an orthogonal basis to use for sampling slope TODO Use Gram-Schmidt for u instead to be 100% safe
             auto u = glm::normalize(glm::cross(apos, glm::vec3(-apos.z, -apos.x, -apos.y))) * 1e-3f;
             auto v = glm::normalize(glm::cross(apos, u)) * 1e-3f;
             auto n = glm::normalize(glm::cross(cpu_noise.get(apos + u) - cpos, cpu_noise.get(apos + v) - cpos));
 
-            return glm::normalize(glm::vec3(m * glm::vec4(n, 1.0f)));
+            n = glm::normalize(glm::vec3(m * glm::vec4(n, 1.0f)));
+            p_position -= p_momentum;
+            p_momentum = 0.5f * (p_momentum - 2.0f * glm::dot(p_momentum, n) * n);
+            p_position += p_momentum;
 
-            // std::cout << "Collision" << std::endl;
-
-            // Cancel movement step that caused intersection, reflect momentum along the normal, not 100% elastic
-
-            // co -= momentum;
-            // momentum = 0.5f * (momentum - 2.0f * glm::dot(momentum, n) * n);
-            // play_audio("impact.wav", cpos, viewmat);
+            collided = true;
         }
 
-        return glm::vec3(0.0f);
+        // Drag - this one could use a lot of work, but as is:
+        // Very close = planetoid movement fully transforms player info as if it was static
+        // Approaching = the transformations are diminished by distance
+        if(norm_p_sq_dist < 9.0f)
+        {
+            float str = std::min(1.0f, 2.0f / norm_p_sq_dist);
+            auto dpos = get_pos() - get_pos(-sim_dt);
+            auto drot = get_rot() - get_rot(-sim_dt);
+            glm::mat4 m_ry = glm::rotate(glm::mat4(1.0f), drot.y * str, glm::vec3(0.0f, 1.0f, 0.0f));
+            p_basis_x = glm::vec3(m_ry * glm::vec4(p_basis_x, 1.0f));
+            p_basis_y = glm::vec3(m_ry * glm::vec4(p_basis_y, 1.0f));
+            p_basis_z = glm::vec3(m_ry * glm::vec4(p_basis_z, 1.0f));
+            // Rotating momentum is very wrong but seems to feel better
+            p_momentum = glm::vec3(m_ry * glm::vec4(p_momentum, 1.0f));
+            p_position += glm::vec3(m_ry * glm::vec4((p_position - get_pos(-sim_dt)), 1.0f)) - (p_position - get_pos(-sim_dt)) + dpos * str;
+        }
+
+        // Grativy - TODO cutoff shouldn't be constant
+        if(norm_p_sq_dist < 9.0f)
+        {
+            p_momentum -= (p_position - get_pos(-sim_dt)) * 0.0001f / norm_p_sq_dist * sim_dt;
+        }
+
+        return collided;
     }
 private:
 
